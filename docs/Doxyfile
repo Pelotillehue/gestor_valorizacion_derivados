@@ -1,0 +1,67 @@
+# Configuración de Doxygen del Valorizador de Derivados.
+# Uso, desde la carpeta del proyecto:  doxygen docs/Doxyfile
+# Resultado: docs/doxygen/html/index.html
+
+#---------------------------------------------------------------------- proyecto
+PROJECT_NAME           = "Valorizador de Derivados"
+PROJECT_NUMBER         = 0.1.0
+PROJECT_BRIEF          = "Valorización de FX Forward, IR Swap y CC Swap con QC Financial"
+OUTPUT_DIRECTORY       = docs/doxygen
+OUTPUT_LANGUAGE        = Spanish
+INPUT_ENCODING         = UTF-8
+
+#---------------------------------------------------------------------- entrada
+INPUT                  = README.md \
+                         docs/arquitectura.md \
+                         valorizador \
+                         app \
+                         scripts \
+                         ejemplos \
+                         migraciones \
+                         tests \
+                         "datos cartera preliminar" \
+                         "datos cartera sintetica"
+FILE_PATTERNS          = *.py *.md
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */.venv/* */__pycache__/* */.pytest_cache/*
+USE_MDFILE_AS_MAINPAGE = README.md
+
+#---------------------------------------------------------------------- Python
+# Los docstrings que empiezan con "!" se interpretan con los comandos de Doxygen.
+PYTHON_DOCSTRING       = YES
+OPTIMIZE_OUTPUT_JAVA   = YES
+JAVADOC_AUTOBRIEF      = NO
+MARKDOWN_SUPPORT       = YES
+
+#---------------------------------------------------------------------- extracción
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+HIDE_UNDOC_MEMBERS     = NO
+SORT_MEMBER_DOCS       = NO
+SHOW_NAMESPACES        = YES
+
+#---------------------------------------------------------------------- avisos
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_LOGFILE           = docs/doxygen/advertencias.log
+
+#---------------------------------------------------------------------- salida
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+GENERATE_TREEVIEW      = YES
+SEARCHENGINE           = YES
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+GENERATE_LATEX         = NO
+
+#---------------------------------------------------------------------- diagramas
+# Con Graphviz instalado (comando dot), cambiar a YES para diagramas de clases y de llamadas.
+HAVE_DOT               = NO
+CLASS_GRAPH            = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+DOT_IMAGE_FORMAT       = svg

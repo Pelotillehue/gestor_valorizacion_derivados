@@ -1,0 +1,47 @@
+# --- Configuración local y secretos ---
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# --- Entorno virtual ---
+.venv/
+venv/
+env/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# --- Tests y herramientas ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Documentación generada por Doxygen (se regenera con docs/Doxyfile) ---
+docs/doxygen/
+
+# --- Cartera preliminar: operaciones reales extraídas de origen ---
+# La app usa la cartera sintética; estos archivos no son necesarios para ejecutarla.
+datos cartera preliminar/*.csv
+datos cartera preliminar/cargar_operaciones.sql
+
+# --- Editores ---
+.vscode/
+.idea/
+*.swp
+
+# --- Windows y macOS ---
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Archivos temporales de Office y logs ---
+~$*
+*.log
