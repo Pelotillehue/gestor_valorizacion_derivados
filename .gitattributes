@@ -1,0 +1,4 @@
+# Heroku ejecuta estos archivos en Linux: deben quedar con fin de línea LF aunque se editen en Windows.
+*.sh text eol=lf
+Procfile text eol=lf
+.python-version text eol=lf

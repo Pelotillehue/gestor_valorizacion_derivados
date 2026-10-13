@@ -6,6 +6,7 @@ Los valores se leen de variables de entorno o del archivo `.env` en la carpeta d
 se ejecuta la API. Ver @ref valorizador.config.Configuracion.
 """
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +36,24 @@ class Configuracion(BaseSettings):
     ## Base exclusiva para los tests de la API. Los tests borran y recrean sus tablas.
     ## Si no se define, esos tests se omiten.
     database_url_test: str | None = None
+
+
+    @field_validator("database_url", "database_url_test")
+    @classmethod
+    def _driver_psycopg(cls, url: str | None) -> str | None:
+        """!
+        @brief Agrega el driver psycopg 3 a una URL de PostgreSQL que no lo indica.
+
+        Heroku entrega `DATABASE_URL` como `postgres://...`; SQLAlchemy necesita
+        `postgresql+psycopg://...`.
+        @param url Cadena de conexión tal como viene del entorno.
+        @return La cadena con el driver explícito.
+        """
+        if url:
+            for prefijo in ("postgres://", "postgresql://"):
+                if url.startswith(prefijo):
+                    return "postgresql+psycopg://" + url[len(prefijo):]
+        return url
 
 
 ## Instancia única de la configuración, compartida por toda la aplicación.

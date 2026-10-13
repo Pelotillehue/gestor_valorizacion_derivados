@@ -113,6 +113,78 @@ MtM en CLP al 2026-10-06
   CCS-0001             48,720,128
 ```
 
+## Despliegue en Heroku
+
+El mismo repositorio se despliega en dos apps de Heroku: una con la API y Heroku Postgres, y
+otra con la app Streamlit. El `Procfile` llama a `scripts/heroku.sh`, que según la variable
+`ROL` de cada app levanta uno u otro servicio. En la app de la API, la fase *release* aplica
+`alembic upgrade head` en cada despliegue.
+
+`.python-version` fija Python 3.11 porque `qcfinancial` sólo publica para Linux una versión
+compilada para 3.11. Heroku corre sobre Linux, aunque localmente se use otra versión.
+
+Requisitos: Heroku CLI instalado y con sesión iniciada (`heroku login`), el proyecto en un
+repositorio git con todo commiteado, y `psql` y `pg_dump` en el PATH si se va a copiar la base
+local.
+
+**1. App de la API con su base de datos.** Los nombres de app son únicos en todo Heroku; si
+uno está tomado, elegir otro.
+
+```powershell
+heroku create valorizador-api
+heroku addons:create heroku-postgresql:essential-0 -a valorizador-api
+heroku config:set ROL=api CLAVE_SECRETA=<texto largo y aleatorio> -a valorizador-api
+```
+
+Heroku define `DATABASE_URL` al agregar Postgres. La API le agrega el driver `psycopg` sola.
+
+**2. Datos.** La forma más simple es copiar la base local completa, con mercado, índices,
+operaciones, contrapartes y usuarios. Se hace antes del primer despliegue, porque la base de
+Heroku debe estar vacía:
+
+```powershell
+heroku pg:push "postgresql://postgres:CLAVE@localhost:5434/Valorizador" DATABASE_URL -a valorizador-api
+```
+
+Si falla, por ejemplo porque la versión de PostgreSQL de Heroku es más antigua que la local,
+desplegar primero (paso 3, que crea las tablas) y cargar los scripts con
+`heroku pg:psql -a valorizador-api`:
+
+```
+\i 'datos mercados demo/cargar_datos_mercado.sql'
+\i 'datos cartera sintetica/cargar_cartera_sintetica.sql'
+```
+
+Luego crear el usuario en Heroku con
+`heroku run python scripts/crear_usuario.py usuario@empresa.cl -a valorizador-api`, y cargar
+los índices con `python scripts/cargar_indices.py --fecha AAAA-MM-DD --api <URL de la API>`.
+
+**3. Desplegar la API:**
+
+```powershell
+heroku git:remote -a valorizador-api -r heroku-api
+git push heroku-api master
+heroku info -a valorizador-api
+```
+
+`heroku info` muestra la *Web URL*. `<URL de la API>/salud` debe responder `{"estado":"ok"}`.
+
+**4. App Streamlit:**
+
+```powershell
+heroku create valorizador-app
+heroku config:set ROL=streamlit VALORIZADOR_API_URL=<URL de la API sin / final> -a valorizador-app
+heroku git:remote -a valorizador-app -r heroku-app
+git push heroku-app master
+heroku open -a valorizador-app
+```
+
+Si la rama local se llama `main`, usar `main` en los `git push`. Para cada nueva versión basta
+repetir los dos `git push`. Los errores se ven con `heroku logs --tail -a <app>`.
+
+Heroku corta las solicitudes que tardan más de 30 segundos. Con la cartera sintética, el
+cálculo más pesado (`GET /cartera/mtm`) tarda menos de un segundo.
+
 ## Endpoints
 
 | Método y ruta | Función |
@@ -289,6 +361,7 @@ migraciones/           Migraciones Alembic
 ejemplos/              Datos de ejemplo y script de carga
 tests/                 Tests del motor y de la API
 docs/                  Doxyfile y página de arquitectura de la documentación Doxygen
+Procfile               Arranque en Heroku, con scripts/heroku.sh
 ```
 
 La base de datos guarda términos contractuales y datos de mercado. Los objetos de QC Financial
