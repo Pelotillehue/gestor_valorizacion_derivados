@@ -25,7 +25,7 @@ from comun import api
 ## Carpeta con las imágenes de la app.
 CARPETA_ASSETS = Path(__file__).parent / "assets"
 
-st.set_page_config(page_title="Valorizador de Derivados", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Gestor de Cartera de Derivados", page_icon="📈", layout="wide")
 
 ## Logo que se muestra arriba del menú lateral.
 LOGO = CARPETA_ASSETS / "logo.png"
