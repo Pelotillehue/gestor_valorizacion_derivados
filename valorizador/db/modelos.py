@@ -26,6 +26,29 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from valorizador.db.base import Base
 
 
+class Usuario(Base):
+    """!
+    @brief Tabla `usuario`: usuarios que pueden iniciar sesión en la app y en la API.
+
+    La clave se guarda como hash, ver @ref valorizador.seguridad.hash_clave.
+    """
+
+    __tablename__ = "usuario"
+
+    ## Correo en minúsculas. Clave primaria.
+    email: Mapped[str] = mapped_column(String(100), primary_key=True)
+    ## Nombre para mostrar.
+    nombre: Mapped[str | None] = mapped_column(String(100))
+    ## Hash PBKDF2 de la clave.
+    hash_clave: Mapped[str] = mapped_column(String(200))
+    ## Un usuario inactivo no puede iniciar sesión y sus tokens dejan de valer.
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    ## Fecha y hora de alta.
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    ## Fecha y hora del último inicio de sesión.
+    ultimo_ingreso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Contraparte(Base):
     """!
     @brief Tabla `contraparte`: maestro de contrapartes con su línea de crédito y MTA, en CLP.

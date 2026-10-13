@@ -3,7 +3,8 @@
 @brief Punto de entrada de la API FastAPI.
 
 Crea la aplicación, registra los routers de @ref valorizador.api y traduce los errores de
-@ref valorizador.errores a respuestas HTTP.
+@ref valorizador.errores a respuestas HTTP. Todos los endpoints salvo `/salud` y
+`/auth/login` exigen el token de @ref valorizador.api.autenticacion.
 
 Para ejecutarla, desde la carpeta del proyecto:
 @code
@@ -14,12 +15,12 @@ La documentación interactiva queda en `http://localhost:8000/docs`.
 
 import re
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
 from valorizador import errores
-from valorizador.api import cartera, contrapartes, mercado, operaciones
+from valorizador.api import autenticacion, cartera, contrapartes, mercado, operaciones
 
 ## Aplicación FastAPI que sirve todos los endpoints.
 app = FastAPI(
@@ -28,10 +29,13 @@ app = FastAPI(
     version="0.1.0",
 )
 
-app.include_router(contrapartes.router)
-app.include_router(operaciones.router)
-app.include_router(mercado.router)
-app.include_router(cartera.router)
+app.include_router(autenticacion.router)
+## Todos los routers de datos exigen un token de sesión, ver @ref valorizador.api.autenticacion.usuario_actual.
+_protegido = [Depends(autenticacion.usuario_actual)]
+app.include_router(contrapartes.router, dependencies=_protegido)
+app.include_router(operaciones.router, dependencies=_protegido)
+app.include_router(mercado.router, dependencies=_protegido)
+app.include_router(cartera.router, dependencies=_protegido)
 
 ## Código HTTP de cada error del dominio. Los que no están aquí responden 400.
 _CODIGOS = {

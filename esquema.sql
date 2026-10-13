@@ -13,6 +13,16 @@ BEGIN;
 
 -- ---------------------------------------------------------------- contrapartes
 
+-- Usuarios de la app. La clave se guarda como hash PBKDF2, nunca en texto plano.
+CREATE TABLE usuario (
+    email           VARCHAR(100) PRIMARY KEY,
+    nombre          VARCHAR(100),
+    hash_clave      VARCHAR(200) NOT NULL,
+    activo          BOOLEAN NOT NULL DEFAULT TRUE,
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ultimo_ingreso  TIMESTAMPTZ
+);
+
 -- Maestro de contrapartes. La línea y el MTA se expresan en CLP.
 CREATE TABLE contraparte (
     rut                VARCHAR(12) NOT NULL,      -- sin puntos y con guion: 76123456-K

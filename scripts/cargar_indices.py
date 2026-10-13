@@ -15,15 +15,21 @@ python scripts/cargar_indices.py --desde 2026-08-01 --fecha 2026-08-25
 
 Para cada índice se cargan todos los valores publicados desde el 01-01-2025, o desde antes si
 alguna pata flotante vigente empieza antes, hasta la fecha de proceso. La fecha inicial se
-puede cambiar con `--desde`.
+puede cambiar con `--desde`. El usuario y la clave de la API se piden por consola o se toman
+de `VALORIZADOR_USUARIO` y `VALORIZADOR_CLAVE`.
 """
 
 import argparse
 import os
 import sys
 from datetime import date, timedelta
+from pathlib import Path
 
 import httpx
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from valorizador.cliente import iniciar_sesion  # noqa: E402
 
 ## Dirección del servicio de datos de mercado del que se descargan los índices.
 SERVICIO = "https://ab-market-data-4595e01f106a.herokuapp.com"
@@ -106,6 +112,7 @@ def main() -> int:
     args = parser.parse_args()
 
     with httpx.Client(base_url=args.api, timeout=120) as api, httpx.Client(base_url=args.servicio, timeout=120) as servicio:
+        iniciar_sesion(api)
         inicios = inicio_por_indice(operaciones_vigentes(api))
         if not inicios:
             print("La cartera vigente no tiene patas flotantes.")

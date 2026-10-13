@@ -44,12 +44,52 @@ def url_base() -> str:
     return st.session_state.get("api_url", URL_POR_DEFECTO).rstrip("/")
 
 
+def _http(url: str, timeout: float) -> httpx.Client:
+    """!
+    @brief Cliente HTTP hacia la API con el token de la sesión de Streamlit, si hay uno.
+    @param url Dirección base de la API.
+    @param timeout Segundos de espera.
+    @return `httpx.Client`.
+    """
+    token = st.session_state.get("token")
+    encabezados = {"Authorization": f"Bearer {token}"} if token else {}
+    return httpx.Client(base_url=url, timeout=timeout, headers=encabezados)
+
+
 def _cliente() -> httpx.Client:
     """!
     @brief Cliente HTTP con la dirección actual y un tiempo de espera de 5 minutos.
     @return `httpx.Client`.
     """
-    return httpx.Client(base_url=url_base(), timeout=300)
+    return _http(url_base(), 300)
+
+
+# ------------------------------------------------------------------ sesión
+
+
+def login(usuario: str, clave: str) -> dict:
+    """!
+    @brief `POST /auth/login`.
+    @param usuario Correo.
+    @param clave Clave.
+    @return Usuario, nombre, token y vencimiento.
+    @throws ErrorAPI 401 si las credenciales no son válidas.
+    """
+    with httpx.Client(base_url=url_base(), timeout=30) as c:
+        return _respuesta(c.post("/auth/login", json={"usuario": usuario, "clave": clave}))
+
+
+def sesion_vigente() -> bool:
+    """!
+    @brief Consulta `GET /auth/yo` con el token de la sesión.
+    @return Falso sólo si la API rechaza el token (401); si la API no responde, verdadero, para
+        no cerrar la sesión por una caída de red.
+    """
+    try:
+        with _cliente() as c:
+            return c.get("/auth/yo", timeout=5).status_code != 401
+    except httpx.HTTPError:
+        return True
 
 
 def _respuesta(r: httpx.Response):
@@ -111,7 +151,7 @@ def operaciones(url: str, estado: str | None = "VIGENTE") -> list[dict]:
     @return Lista de operaciones.
     """
     resultado, desde = [], 0
-    with httpx.Client(base_url=url, timeout=300) as c:
+    with _http(url, 300) as c:
         while True:
             params = {"limite": TAMANO_PAGINA, "desde": desde}
             if estado:
@@ -195,7 +235,7 @@ def contrapartes(url: str) -> list[dict]:
     @param url Dirección base de la API; forma parte de la clave del caché.
     @return Lista de contrapartes.
     """
-    with httpx.Client(base_url=url, timeout=60) as c:
+    with _http(url, 60) as c:
         return _respuesta(c.get("/contrapartes"))
 
 
@@ -232,7 +272,7 @@ def cartera_mtm(url: str, fecha: date, moneda: str) -> dict:
     @param moneda Moneda del resultado.
     @return MtM de la cartera.
     """
-    with httpx.Client(base_url=url, timeout=600) as c:
+    with _http(url, 600) as c:
         return _respuesta(c.get("/cartera/mtm", params={"fecha": fecha.isoformat(), "moneda": moneda}))
 
 
@@ -244,7 +284,7 @@ def cartera_vencimientos(url: str, fecha: date) -> dict:
     @param fecha Fecha de proceso.
     @return Montos al vencimiento.
     """
-    with httpx.Client(base_url=url, timeout=600) as c:
+    with _http(url, 600) as c:
         return _respuesta(c.get("/cartera/vencimientos", params={"fecha": fecha.isoformat()}))
 
 
@@ -256,7 +296,7 @@ def cartera_garantias(url: str, fecha: date) -> dict:
     @param fecha Fecha de proceso.
     @return Control de garantías por contraparte.
     """
-    with httpx.Client(base_url=url, timeout=600) as c:
+    with _http(url, 600) as c:
         return _respuesta(c.get("/cartera/garantias", params={"fecha": fecha.isoformat()}))
 
 
@@ -268,7 +308,7 @@ def cartera_flujos(url: str, fecha: date) -> dict:
     @param fecha Fecha de proceso.
     @return Flujos futuros de la cartera.
     """
-    with httpx.Client(base_url=url, timeout=600) as c:
+    with _http(url, 600) as c:
         return _respuesta(c.get("/cartera/flujos", params={"fecha": fecha.isoformat()}))
 
 
@@ -281,7 +321,7 @@ def cartera_pnl_realizado(url: str, fecha: date, desde: date) -> dict:
     @param desde Primer vencimiento incluido.
     @return P&L realizado de los forwards vencidos en el período.
     """
-    with httpx.Client(base_url=url, timeout=600) as c:
+    with _http(url, 600) as c:
         return _respuesta(c.get("/cartera/pnl-realizado", params={"fecha": fecha.isoformat(), "desde": desde.isoformat()}))
 
 
@@ -305,7 +345,7 @@ def resumen_mercado(url: str) -> dict:
     @param url Dirección base de la API; forma parte de la clave del caché.
     @return Series guardadas con su rango de fechas.
     """
-    with httpx.Client(base_url=url, timeout=60) as c:
+    with _http(url, 60) as c:
         return _respuesta(c.get("/mercado/resumen"))
 
 
@@ -329,7 +369,7 @@ def serie_indice(url: str, indice: str, desde: date | None = None, hasta: date |
     @param hasta Última fecha, opcional.
     @return Diccionario fecha → valor.
     """
-    with httpx.Client(base_url=url, timeout=60) as c:
+    with _http(url, 60) as c:
         return _respuesta(c.get(f"/mercado/indices/{indice}", params=_rango(desde, hasta)))
 
 
@@ -343,7 +383,7 @@ def serie_fx(url: str, par: str, desde: date | None = None, hasta: date | None =
     @param hasta Última fecha, opcional.
     @return Diccionario fecha → valor.
     """
-    with httpx.Client(base_url=url, timeout=60) as c:
+    with _http(url, 60) as c:
         return _respuesta(c.get(f"/mercado/fx/{par}", params=_rango(desde, hasta)))
 
 
@@ -357,5 +397,5 @@ def historia_curva(url: str, codigo: str, desde: date | None = None, hasta: date
     @param hasta Última fecha, opcional.
     @return Lista de curvas con sus vértices.
     """
-    with httpx.Client(base_url=url, timeout=120) as c:
+    with _http(url, 120) as c:
         return _respuesta(c.get(f"/mercado/curvas/{codigo}/historia", params=_rango(desde, hasta)))

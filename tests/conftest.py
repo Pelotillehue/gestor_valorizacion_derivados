@@ -15,7 +15,14 @@ from sqlalchemy.orm import sessionmaker
 
 from ejemplos import datos
 from valorizador.config import configuracion
+from valorizador.seguridad import hash_clave
 from valorizador.valorizacion.escenario import CurvaDatos, EscenarioMercado
+
+
+## Usuario que se crea en la base de pruebas y con el que inicia sesión el cliente de la API.
+USUARIO = "prueba@ejemplo.cl"
+## Clave de ese usuario.
+CLAVE = "clave-de-prueba"
 
 
 @pytest.fixture
@@ -46,7 +53,7 @@ def escenario() -> EscenarioMercado:
 @pytest.fixture
 def api():
     """!
-    @brief Cliente de la API sobre una base de pruebas recién creada, con las contrapartes de ejemplo.
+    @brief Cliente de la API con sesión iniciada, sobre una base de pruebas recién creada, con las contrapartes de ejemplo.
 
     Reemplaza la dependencia de sesión de la aplicación por una sesión sobre `DATABASE_URL_TEST`.
     @return `TestClient` de FastAPI.
@@ -81,7 +88,12 @@ def api():
             sesion.close()
 
     app.dependency_overrides[obtener_sesion] = sesion_de_prueba
+    with Sesion() as sesion:
+        sesion.add(modelos.Usuario(email=USUARIO, nombre="Usuario de prueba", hash_clave=hash_clave(CLAVE)))
+        sesion.commit()
     with TestClient(app) as cliente:
+        token = cliente.post("/auth/login", json={"usuario": USUARIO, "clave": CLAVE}).json()["token"]
+        cliente.headers["Authorization"] = f"Bearer {token}"
         for contraparte in datos.CONTRAPARTES:  # las operaciones de ejemplo las referencian
             assert cliente.post("/contrapartes", json=contraparte).status_code == 201
         yield cliente

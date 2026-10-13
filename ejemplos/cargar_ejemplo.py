@@ -14,6 +14,7 @@ import sys
 import httpx
 
 from ejemplos import datos
+from valorizador.cliente import iniciar_sesion
 
 
 def main(url_base: str) -> None:
@@ -22,6 +23,7 @@ def main(url_base: str) -> None:
     @param url_base Dirección de la API.
     """
     with httpx.Client(base_url=url_base, timeout=30) as api:
+        iniciar_sesion(api)
         api.post("/mercado/fx", json=datos.FX).raise_for_status()
         api.post("/mercado/feriados", json=datos.FERIADOS).raise_for_status()
         for curva in datos.CURVAS:

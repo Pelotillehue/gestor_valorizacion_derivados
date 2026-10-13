@@ -33,6 +33,33 @@ alembic upgrade head
 
 Si `psql` no está en el PATH, la base se puede crear desde pgAdmin.
 
+Crear al menos un usuario para iniciar sesión (pide la clave sin mostrarla):
+
+```powershell
+python scripts/crear_usuario.py usuario@empresa.cl --nombre "Nombre Apellido"
+```
+
+## Usuarios y sesión
+
+La app pide usuario y clave antes de mostrar cualquier página. La API los compara con la tabla
+`usuario`, donde la clave se guarda como hash PBKDF2-SHA256 con sal, nunca en texto plano, y
+entrega un token de sesión firmado que vale `HORAS_SESION` horas (12 por defecto).
+
+Todos los endpoints salvo `GET /salud` y `POST /auth/login` exigen ese token en el header
+`Authorization: Bearer <token>`. En `/docs` se ingresa con el botón *Authorize*, pegando el
+token que devuelve `POST /auth/login`.
+
+| Variable de `.env` | Uso |
+|---|---|
+| `CLAVE_SECRETA` | Clave con que se firman los tokens. Debe ser larga, aleatoria y la misma en todas las instancias de la API. Si falta, la API genera una al iniciar y las sesiones se pierden cada vez que se reinicia |
+| `HORAS_SESION` | Horas de validez de una sesión |
+| `REQUERIR_AUTENTICACION` | `false` desactiva la exigencia de token, sólo para desarrollo local |
+
+`scripts/crear_usuario.py` crea un usuario, le cambia la clave si ya existe, o lo desactiva con
+`--desactivar`. Los scripts que usan la API (`scripts/cargar_indices.py` y
+`ejemplos/cargar_ejemplo.py`) piden usuario y clave por consola, o los toman de
+`VALORIZADOR_USUARIO` y `VALORIZADOR_CLAVE`.
+
 ## Ejecución
 
 ```powershell
@@ -90,6 +117,8 @@ MtM en CLP al 2026-10-06
 
 | Método y ruta | Función |
 |---|---|
+| `POST /auth/login` | Valida usuario y clave y entrega un token de sesión |
+| `GET /auth/yo` | Usuario del token; responde 401 si la sesión venció |
 | `POST /contrapartes` | Alta de una contraparte: RUT, nombre, monto de línea y MTA |
 | `GET /contrapartes` y `GET /contrapartes/{rut}` | Maestro de contrapartes |
 | `PATCH /contrapartes/{rut}` | Modifica nombre, línea o MTA |
@@ -242,6 +271,8 @@ valorizador/
 ├── config.py          Configuración desde .env
 ├── enums.py           Productos, tipos de pata, monedas y convenciones
 ├── errores.py         Errores del dominio
+├── seguridad.py       Hash de claves y tokens de sesión
+├── cliente.py         Inicio de sesión para scripts que usan la API
 ├── api/               Endpoints
 ├── schemas/           Modelos Pydantic de entrada y salida
 ├── db/                Modelos SQLAlchemy y sesión
@@ -251,7 +282,7 @@ valorizador/
     ├── constructores.py  Traducción a objetos de QC Financial
     └── motor.py       MtM, sensibilidades y fecha de último pago
 app/
-├── inicio.py          App Streamlit: navegación y conexión con la API
+├── inicio.py          App Streamlit: inicio de sesión, navegación y conexión con la API
 ├── paginas/           Una página por pantalla; las tres de operaciones usan comun/vista_operaciones.py
 └── comun/             Cliente de la API, plantilla de carga, reportes Excel y PDF
 migraciones/           Migraciones Alembic
@@ -344,15 +375,18 @@ Los cupones de los swaps no se incluyen.
 
 ## Actualizar una base existente
 
-Una base creada antes de la revisión 0007 puede no tener las columnas `modalidad_liquidacion`
+Una base creada antes de la revisión 0008 puede no tener las columnas `modalidad_liquidacion`
 (revisión 0003) o `grupo_calce` (0005), tener la tabla de índices con el nombre `fixing`
 (0004) o guardar el nombre de la contraparte en la operación en vez de su RUT (0006), o no tener
-`tipo_amortizacion` en las patas (0007, que la deja en `BULLET` en las patas con cupones). Se
-actualiza con:
+`tipo_amortizacion` en las patas (0007, que la deja en `BULLET` en las patas con cupones), o
+no tener la tabla `usuario` (0008). Se actualiza con:
 
 ```powershell
 alembic upgrade head
 ```
+
+Después de la revisión 0008 hay que crear un usuario con `scripts/crear_usuario.py`; sin él no
+se puede iniciar sesión.
 
 Las operaciones existentes quedan como `COMPENSACION`. La revisión 0006 crea una contraparte
 por cada nombre distinto, con RUT ficticio y línea y MTA en cero; la cartera sintética las

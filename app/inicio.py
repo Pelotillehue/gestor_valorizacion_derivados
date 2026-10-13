@@ -2,8 +2,10 @@
 @package inicio
 @brief Punto de entrada de la app Streamlit del Valorizador de Derivados.
 
-Define el menú (secciones Cartera, Mercado, Reportes y Archivos), el logo y la barra lateral
-con la dirección de la API, su estado de conexión y el botón para volver a leer los datos.
+Pide usuario y clave antes de mostrar cualquier página: los valida la API contra la tabla
+`usuario` y entrega un token que la app guarda en la sesión de Streamlit. Luego define el menú
+(secciones Cartera, Mercado, Reportes y Archivos), el logo y la barra lateral con el usuario,
+la dirección de la API, su estado de conexión y el botón para volver a leer los datos.
 
 Uso, con la API corriendo en otra terminal, desde la carpeta del proyecto:
 @code
@@ -39,6 +41,50 @@ if LOGO.exists():
         </style>"""
     )
 
+st.session_state.setdefault("api_url", api.URL_POR_DEFECTO)
+
+
+def pantalla_login(aviso: str | None = None) -> None:
+    """!
+    @brief Formulario de inicio de sesión. Si las credenciales son válidas guarda el token y recarga la app.
+    @param aviso Mensaje opcional sobre la sesión anterior, por ejemplo que venció.
+    """
+    _, centro, _ = st.columns([1.1, 1, 1.1])
+    with centro:
+        st.subheader("Valorizador de Derivados", anchor=False)
+        if aviso:
+            st.warning(aviso)
+        with st.form("login"):
+            usuario = st.text_input("Usuario", placeholder="correo@empresa.cl")
+            clave = st.text_input("Clave", type="password")
+            ingresar = st.form_submit_button("Ingresar", type="primary", icon=":material/login:", width="stretch")
+        with st.expander("Dirección de la API"):
+            # Sin key: el campo de la barra lateral usa la key "api_url" y Streamlit borra el
+            # estado de un widget que deja de mostrarse.
+            st.session_state["api_url"] = st.text_input(
+                "Dirección de la API", value=st.session_state["api_url"], label_visibility="collapsed"
+            )
+        if ingresar:
+            try:
+                sesion = api.login(usuario, clave)
+            except api.ErrorAPI as e:
+                st.error("Usuario o clave incorrectos." if e.codigo == 401 else api.texto_error(e))
+            except Exception as e:
+                st.error(api.texto_error(e))
+            else:
+                st.session_state.update(token=sesion["token"], usuario=sesion["usuario"], nombre=sesion.get("nombre"))
+                st.rerun()
+
+
+if not st.session_state.get("token"):
+    pantalla_login()
+    st.stop()
+if not api.sesion_vigente():
+    for clave in ("token", "usuario", "nombre"):
+        st.session_state.pop(clave, None)
+    pantalla_login("La sesión venció o ya no es válida. Ingrese nuevamente.")
+    st.stop()
+
 paginas = st.navigation(
     {
         "Cartera": [
@@ -67,7 +113,12 @@ paginas = st.navigation(
 )
 
 with st.sidebar:
-    st.session_state.setdefault("api_url", api.URL_POR_DEFECTO)
+    st.caption(f":material/person: {st.session_state.get('nombre') or st.session_state['usuario']}")
+    if st.button("Cerrar sesión", icon=":material/logout:", width="stretch"):
+        for clave in ("token", "usuario", "nombre"):
+            st.session_state.pop(clave, None)
+        api.limpiar_cache()
+        st.rerun()
     st.text_input("Dirección de la API", key="api_url")
     if api.salud():
         st.caption(":green[●] API conectada")

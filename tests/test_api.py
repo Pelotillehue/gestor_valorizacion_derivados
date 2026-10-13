@@ -559,3 +559,54 @@ def test_pnl_realizado(api_con_datos):
     assert respuesta["pnl_total"] == pytest.approx(fila["pnl"])
     vacio = api_con_datos.get("/cartera/pnl-realizado", params={"fecha": "2026-12-31"}).json()
     assert vacio["operaciones"] == []
+
+
+# ------------------------------------------------------------------ autenticación
+
+
+def test_login_entrega_token_y_yo_lo_reconoce(api):
+    """!
+    @brief Con la clave correcta se obtiene un token; `GET /auth/yo` devuelve su usuario.
+    """
+    from tests.conftest import CLAVE, USUARIO
+
+    r = api.post("/auth/login", json={"usuario": USUARIO.upper(), "clave": CLAVE}, headers={"Authorization": ""})
+    assert r.status_code == 200
+    token = r.json()["token"]
+    yo = api.get("/auth/yo", headers={"Authorization": f"Bearer {token}"})
+    assert yo.json()["usuario"] == USUARIO
+
+
+def test_login_con_clave_incorrecta_responde_401(api):
+    """!
+    @brief Una clave errada o un usuario inexistente responden 401 con el mismo mensaje.
+    """
+    from tests.conftest import USUARIO
+
+    malo = api.post("/auth/login", json={"usuario": USUARIO, "clave": "otra"})
+    inexistente = api.post("/auth/login", json={"usuario": "nadie@ejemplo.cl", "clave": "otra"})
+    assert malo.status_code == inexistente.status_code == 401
+    assert malo.json() == inexistente.json()
+
+
+def test_endpoints_exigen_token(api):
+    """!
+    @brief Sin token o con un token alterado los datos responden 401; `/salud` sigue abierto.
+    """
+    assert api.get("/contrapartes", headers={"Authorization": ""}).status_code == 401
+    token = api.headers["Authorization"].removeprefix("Bearer ")
+    alterado = token[:-2] + ("AA" if not token.endswith("AA") else "BB")
+    assert api.get("/contrapartes", headers={"Authorization": f"Bearer {alterado}"}).status_code == 401
+    assert api.get("/salud", headers={"Authorization": ""}).status_code == 200
+
+
+def test_token_vencido_no_vale():
+    """!
+    @brief Un token con vencimiento pasado no se acepta.
+    """
+    from valorizador import seguridad
+
+    token, _ = seguridad.crear_token("prueba@ejemplo.cl", -1)
+    assert seguridad.leer_token(token) is None
+    vigente, _ = seguridad.crear_token("prueba@ejemplo.cl", 1)
+    assert seguridad.leer_token(vigente) == "prueba@ejemplo.cl"
