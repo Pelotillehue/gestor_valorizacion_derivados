@@ -211,3 +211,72 @@ class PnlRealizadoCartera(BaseModel):
     pnl_total: float
     ## Una fila por operación vencida en el período.
     operaciones: list[PnlRealizadoOperacion]
+
+
+class ForwardBasilea(BaseModel):
+    """!
+    @brief Un FX Forward vigente en el detalle Basilea (`GET /cartera/forwards-basilea`).
+
+    La moneda principal es la moneda extranjera del par (USD, EUR o UF) y la secundaria la otra.
+    El movimiento es Compra si la institución recibe la moneda principal y Venta si la entrega.
+    El valor razonable activo es el valor presente de lo que se recibe y el pasivo el de lo que se
+    paga, ambos en CLP y positivos; el valor razonable es su diferencia.
+    """
+
+    ## Folio.
+    deal_number: str
+    ## RUT de la contraparte.
+    rut_contraparte: str | None
+    ## Nombre de la contraparte.
+    contraparte: str | None
+    ## Modalidad de liquidación.
+    modalidad_liquidacion: str
+    ## Grupo de calce; nulo si la operación está descalzada.
+    grupo_calce: str | None = None
+    ## Compra o Venta de la moneda principal, desde la institución.
+    movimiento: str
+    ## Par del forward, por ejemplo `USD/CLP`.
+    par: str
+    ## Moneda principal (extranjera).
+    moneda_principal: str
+    ## Monto en la moneda principal.
+    monto_principal: float
+    ## Moneda secundaria.
+    moneda_secundaria: str
+    ## Monto en la moneda secundaria.
+    monto_secundario: float
+    ## Precio pactado: unidades de moneda secundaria por una de la principal.
+    tipo_cambio: float
+    ## Fecha de negociación.
+    fecha_negociacion: date
+    ## Días entre la negociación y el vencimiento.
+    plazo: int
+    ## Fecha de vencimiento.
+    fecha_vencimiento: date
+    ## Días entre la fecha de proceso y el vencimiento.
+    dias_al_vencimiento: int
+    ## Tasa de la curva de descuento de la pata que se recibe al plazo residual, en tanto por uno.
+    tasa_activo: float | None = None
+    ## Valor presente de lo que se recibe, en CLP.
+    valor_razonable_activo: float | None = None
+    ## Tasa de la curva de descuento de la pata que se paga al plazo residual, en tanto por uno.
+    tasa_pasivo: float | None = None
+    ## Valor presente de lo que se paga, en CLP, positivo.
+    valor_razonable_pasivo: float | None = None
+    ## Valor razonable (MtM) en CLP: activo menos pasivo. Nulo si no se pudo valorizar.
+    valor_razonable: float | None = None
+    ## Motivo por el que no se valorizó.
+    error: str | None = None
+
+
+class ForwardsBasilea(BaseModel):
+    """!
+    @brief Respuesta de `GET /cartera/forwards-basilea`.
+    """
+
+    ## Fecha de proceso.
+    fecha_proceso: date
+    ## Moneda de los valores razonables (CLP).
+    moneda: str
+    ## Un FX Forward vigente por fila.
+    operaciones: list[ForwardBasilea]

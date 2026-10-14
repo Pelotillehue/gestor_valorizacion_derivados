@@ -9,6 +9,7 @@ su línea, su MTA y su situación.
 """
 
 import io
+from collections import Counter
 from xml.sax.saxutils import escape
 from datetime import date, datetime
 
@@ -36,14 +37,38 @@ ROJO = "C00000"
 COLUMNAS_GARANTIA = ["Monto Línea (CLP)", "MTA (CLP)", "Exceso sobre línea", "Situación", "Monto a llamar"]
 
 
+def grupos_calce(operaciones: list[dict], perspectiva_contraparte: bool) -> dict[str, str]:
+    """!
+    @brief Grupo de calce de cada operación según la perspectiva.
+
+    Desde la institución, una operación está calzada si tiene grupo de calce. Desde el cliente,
+    sólo si otra operación del mismo grupo es con la misma contraparte: si la institución la
+    cubrió con otra contraparte, para el cliente queda descalzada.
+    @param operaciones Operaciones con `deal_number`, `grupo_calce` y `rut_contraparte`.
+    @param perspectiva_contraparte Si es verdadero, clasifica desde la contraparte.
+    @return Diccionario folio → grupo de calce; vacío si la operación está descalzada.
+    """
+    if not perspectiva_contraparte:
+        return {o["deal_number"]: o.get("grupo_calce") or "" for o in operaciones}
+    por_grupo = Counter((o.get("grupo_calce"), o.get("rut_contraparte")) for o in operaciones if o.get("grupo_calce"))
+    return {
+        o["deal_number"]: o["grupo_calce"]
+        if o.get("grupo_calce") and por_grupo[(o["grupo_calce"], o.get("rut_contraparte"))] > 1
+        else ""
+        for o in operaciones
+    }
+
+
 def detalle(operaciones: list[dict], perspectiva_contraparte: bool) -> pd.DataFrame:
     """!
     @brief Una fila por operación valorizada, con su P&L desde la perspectiva elegida.
     @param operaciones Operaciones de `GET /cartera/mtm`.
-    @param perspectiva_contraparte Si es verdadero, invierte el signo (P&L del cliente).
+    @param perspectiva_contraparte Si es verdadero, invierte el signo (P&L del cliente) y clasifica
+        el calce desde la contraparte, ver @ref comun.reporte_pnl.grupos_calce.
     @return DataFrame.
     """
     signo = -1 if perspectiva_contraparte else 1
+    grupo = grupos_calce(operaciones, perspectiva_contraparte)
     filas = [
         {
             "Rut Contraparte": rut(o.get("rut_contraparte")),
@@ -51,8 +76,8 @@ def detalle(operaciones: list[dict], perspectiva_contraparte: bool) -> pd.DataFr
             "Folio": o["deal_number"],
             "Producto": PRODUCTOS.get(o["producto"], o["producto"]),
             "Modalidad": MODALIDADES.get(o["modalidad_liquidacion"], o["modalidad_liquidacion"]),
-            "Estado calce": "Calzada" if o.get("grupo_calce") else "Descalzada",
-            "Grupo de calce": o.get("grupo_calce") or "",
+            "Estado calce": "Calzada" if grupo[o["deal_number"]] else "Descalzada",
+            "Grupo de calce": grupo[o["deal_number"]],
             "Vencimiento": pd.Timestamp(o["fecha_vencimiento"]),
             "P&L no realizado": signo * o["mtm"],
         }
@@ -107,18 +132,20 @@ def detalle_realizado(operaciones: list[dict], perspectiva_contraparte: bool) ->
     """!
     @brief Una fila por operación liquidada, con su P&L realizado desde la perspectiva elegida.
     @param operaciones Operaciones de `GET /cartera/pnl-realizado`.
-    @param perspectiva_contraparte Si es verdadero, invierte el signo (P&L del cliente).
+    @param perspectiva_contraparte Si es verdadero, invierte el signo (P&L del cliente) y clasifica
+        el calce desde la contraparte, ver @ref comun.reporte_pnl.grupos_calce.
     @return DataFrame.
     """
     signo = -1 if perspectiva_contraparte else 1
+    grupo = grupos_calce(operaciones, perspectiva_contraparte)
     filas = [
         {
             "Rut Contraparte": rut(o.get("rut_contraparte")),
             "Contraparte": o.get("contraparte") or "(sin contraparte)",
             "Folio": o["deal_number"],
             "Modalidad": MODALIDADES.get(o["modalidad_liquidacion"], o["modalidad_liquidacion"]),
-            "Estado calce": "Calzada" if o.get("grupo_calce") else "Descalzada",
-            "Grupo de calce": o.get("grupo_calce") or "",
+            "Estado calce": "Calzada" if grupo[o["deal_number"]] else "Descalzada",
+            "Grupo de calce": grupo[o["deal_number"]],
             "Negociación": pd.Timestamp(o["fecha_negociacion"]),
             "Vencimiento": pd.Timestamp(o["fecha_vencimiento"]),
             "Moneda recibe": "UF" if o["moneda_recibe"] == "CLF" else o["moneda_recibe"],
@@ -186,7 +213,7 @@ def excel_realizado(tabla: pd.DataFrame, detalle_ops: pd.DataFrame, desde: date,
             hoja["A1"] = "P&L realizado"
             hoja["A1"].font = Font(bold=True, size=14)
             hoja["A2"] = f"Vencimientos del {desde:%d-%m-%Y} al {fecha:%d-%m-%Y}, en CLP. Perspectiva: {perspectiva}."
-            hoja["A2"].font = Font(italic=True, color="52514E")
+            hoja["A2"].font = Font(color="52514E")
             for celda in hoja[4]:
                 for atributo, valor in encabezado.items():
                     setattr(celda, atributo, valor)
@@ -262,7 +289,7 @@ def excel(
         )
         for celda in ("B2", "D2"):
             hoja[celda].font = Font(bold=True)
-        hoja["B3"].font = Font(italic=True, color="52514E")
+        hoja["B3"].font = Font(color="52514E")
 
         for rango, titulo in (("B4:B5", "Rut Contraparte"), ("C4:C5", "Contraparte")):
             hoja.merge_cells(rango)

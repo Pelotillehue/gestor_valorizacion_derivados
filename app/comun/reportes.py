@@ -151,7 +151,7 @@ def excel(producto: str, tabla: pd.DataFrame, fecha_mtm=None, moneda_mtm=None) -
         hoja["A1"] = f"{PRODUCTOS[producto]}"
         hoja["A1"].font = Font(bold=True, size=14)
         hoja["A2"] = _subtitulo(fecha_mtm, moneda_mtm)
-        hoja["A2"].font = Font(italic=True, color="52514E")
+        hoja["A2"].font = Font(color="52514E")
         encabezado = 4
         for celda in hoja[encabezado]:
             celda.font = Font(bold=True, color="FFFFFF")

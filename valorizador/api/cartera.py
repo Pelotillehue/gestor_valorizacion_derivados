@@ -20,6 +20,8 @@ from valorizador.repositorios import contrapartes as repo_contrapartes
 from valorizador.repositorios import mercado as repo_mercado
 from valorizador.repositorios import operaciones as repo
 from valorizador.schemas.cartera import (
+    ForwardBasilea,
+    ForwardsBasilea,
     PnlRealizadoCartera,
     PnlRealizadoOperacion,
     FlujoCaja,
@@ -33,6 +35,7 @@ from valorizador.schemas.cartera import (
 from valorizador.schemas.contrapartes import GarantiaContraparte, GarantiasCartera
 from valorizador.schemas.operaciones import OperacionSalida
 from valorizador.valorizacion import motor
+from valorizador.valorizacion.constructores import construir_curva
 from valorizador.valorizacion.escenario import EscenarioMercado
 
 ## Router montado en `/cartera`.
@@ -432,3 +435,67 @@ def pnl_realizado(
         pnl_total=sum(f.pnl for f in filas if f.pnl is not None),
         operaciones=filas,
     )
+
+
+## Orden en que se elige la moneda principal de un forward: la primera presente.
+_ORDEN_PRINCIPAL = ["CLF", "EUR", "USD", "CLP"]
+
+
+@router.get(
+    "/forwards-basilea",
+    response_model=ForwardsBasilea,
+    summary="Detalle de FX Forward vigentes con valor razonable activo y pasivo",
+)
+def forwards_basilea(db: Sesion, fecha: FechaProceso):
+    """!
+    @brief `GET /cartera/forwards-basilea`: detalle de los FX Forward vigentes para el reporte Basilea.
+
+    Por operación entrega el par, el movimiento (Compra o Venta de la moneda principal), los
+    montos, el plazo, y el valor presente en CLP de lo que se recibe (activo) y de lo que se paga
+    (pasivo), con la tasa de la curva de descuento de cada pata al plazo residual.
+    @param db Sesión de base de datos.
+    @param fecha Fecha de proceso.
+    @return @ref valorizador.schemas.cartera.ForwardsBasilea.
+    """
+    operaciones = _vigentes(db, Producto.FX_FORWARD, fecha)
+    escenario = repo_mercado.cargar_escenario_cartera(db, fecha, operaciones)
+    filas = []
+    for operacion in operaciones:
+        por_moneda = {p.moneda.value: p for p in operacion.patas}
+        principal, secundaria = sorted(por_moneda, key=lambda m: _ORDEN_PRINCIPAL.index(m) if m in _ORDEN_PRINCIPAL else 99)
+        pata_principal = por_moneda[principal]
+        recibe = next(p for p in operacion.patas if p.rec_pay == RecPay.RECIBE)
+        dias = (operacion.fecha_vencimiento - fecha).days
+        fila = dict(
+            deal_number=operacion.deal_number,
+            rut_contraparte=operacion.rut_contraparte,
+            contraparte=operacion.contraparte,
+            modalidad_liquidacion=operacion.modalidad_liquidacion.value,
+            grupo_calce=operacion.grupo_calce,
+            movimiento="Compra" if pata_principal.rec_pay == RecPay.RECIBE else "Venta",
+            par=f"{principal}/{secundaria}",
+            moneda_principal=principal,
+            monto_principal=pata_principal.nocional,
+            moneda_secundaria=secundaria,
+            monto_secundario=por_moneda[secundaria].nocional,
+            tipo_cambio=por_moneda[secundaria].nocional / pata_principal.nocional,
+            fecha_negociacion=operacion.fecha_negociacion,
+            plazo=(operacion.fecha_vencimiento - operacion.fecha_negociacion).days,
+            fecha_vencimiento=operacion.fecha_vencimiento,
+            dias_al_vencimiento=dias,
+        )
+        try:
+            valor = motor.valorizar(operacion, escenario, "CLP")
+            for pata_valor, pata in zip(valor.patas, sorted(operacion.patas, key=lambda p: p.numero)):
+                tasa = construir_curva(escenario.curva(pata.curva_descuento)).get_rate_at(dias)
+                if pata.rec_pay == recibe.rec_pay:
+                    fila.update(tasa_activo=tasa, valor_razonable_activo=pata_valor.valor_presente_convertido)
+                else:
+                    fila.update(tasa_pasivo=tasa, valor_razonable_pasivo=-pata_valor.valor_presente_convertido)
+            fila["valor_razonable"] = valor.mtm
+        except ErrorValorizador as e:
+            fila["error"] = str(e)
+        except (RuntimeError, ValueError) as e:  # errores de qcfinancial
+            fila["error"] = f"Error de cálculo: {e}"
+        filas.append(ForwardBasilea(**fila))
+    return ForwardsBasilea(fecha_proceso=fecha, moneda="CLP", operaciones=filas)

@@ -561,6 +561,23 @@ def test_pnl_realizado(api_con_datos):
     assert vacio["operaciones"] == []
 
 
+def test_forwards_basilea(api_con_datos):
+    """!
+    @brief El detalle Basilea separa el valor presente de cada pata y su diferencia es el MtM.
+    """
+    respuesta = api_con_datos.get("/cartera/forwards-basilea", params={"fecha": datos.FECHA}).json()
+    [fila] = respuesta["operaciones"]
+    assert fila["deal_number"] == "FWD-0001"
+    assert fila["par"] == "USD/CLP"
+    assert fila["movimiento"] == "Compra"  # recibe USD
+    assert fila["tipo_cambio"] == pytest.approx(955)
+    assert fila["valor_razonable_activo"] > 0 and fila["valor_razonable_pasivo"] > 0
+    assert fila["valor_razonable"] == pytest.approx(fila["valor_razonable_activo"] - fila["valor_razonable_pasivo"])
+    mtm = api_con_datos.get("/operaciones/FWD-0001/mtm", params={"fecha": datos.FECHA}).json()["mtm"]
+    assert fila["valor_razonable"] == pytest.approx(mtm)
+    assert 0 < fila["tasa_activo"] < 0.2 and 0 < fila["tasa_pasivo"] < 0.2
+
+
 # ------------------------------------------------------------------ autenticación
 
 

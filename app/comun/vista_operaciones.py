@@ -123,14 +123,14 @@ def _lado(pata: dict, lado: str) -> dict:
     }
 
 
-## Orden de las columnas de la tabla de swaps: tasas y curvas primero, para que se vean sin desplazar.
+## Orden de las columnas de la tabla de swaps: cada nocional junto a su moneda, luego tasas y curvas.
 ORDEN_SWAPS = [
     "Folio", "Rut Contraparte", "Contraparte",
-    "Moneda Recibe", "Tipo Tasa Recibe", "Tasa Recibe", "Spread Recibe (%)",
+    "Moneda Recibe", "Nocional Recibe", "Tipo Tasa Recibe", "Tasa Recibe", "Spread Recibe (%)",
     "Curva Proyección Recibe", "Curva Descuento Recibe",
-    "Moneda Paga", "Tipo Tasa Paga", "Tasa Paga", "Spread Paga (%)",
+    "Moneda Paga", "Nocional Paga", "Tipo Tasa Paga", "Tasa Paga", "Spread Paga (%)",
     "Curva Proyección Paga", "Curva Descuento Paga",
-    "Nocional Recibe", "Nocional Paga", "Calce", "Modalidad", "Inicio", "Vencimiento", "Periodicidad", "Negociación",
+    "Calce", "Modalidad", "Inicio", "Vencimiento", "Periodicidad", "Negociación",
 ]  # fmt: skip
 
 
@@ -198,10 +198,10 @@ def _formato_carga(operaciones: list[dict]) -> bytes:
 
 def mostrar(producto: str) -> None:
     """!
-    @brief Dibuja la página completa de las operaciones vigentes de un producto.
+    @brief Dibuja la página completa de las operaciones de un producto.
 
-    Lee las operaciones con @ref comun.api.operaciones, muestra filtros por contraparte, modalidad,
-    calce y folio, la tabla y, al seleccionar una fila, el detalle de las patas y su MtM con
+    Lee las operaciones con @ref comun.api.operaciones. Por defecto muestra sólo las vigentes a la
+    fecha de proceso; además filtra por contraparte, modalidad, calce y folio, y muestra la tabla y, al seleccionar una fila, el detalle de las patas y su MtM con
     @ref comun.api.mtm.
     @param producto Código del producto.
     """
@@ -221,6 +221,29 @@ def mostrar(producto: str) -> None:
     if not operaciones:
         st.info(f"No hay operaciones vigentes de {PRODUCTOS[producto]}.")
         st.stop()
+
+    # Vigencia a la fecha de proceso: ya negociada y aún no vencida, como en el MtM de cartera.
+    v1, v2, _ = st.columns([1.2, 2, 2.8], vertical_alignment="bottom")
+    fecha_proceso = v1.date_input(
+        "Fecha de proceso", value=st.session_state.get("fecha_proceso", FECHA_INICIAL), format="DD-MM-YYYY",
+        key=f"fecha_vigencia_{producto}",
+    )  # fmt: skip
+    st.session_state["fecha_proceso"] = fecha_proceso
+    solo_vigentes = v2.toggle(
+        "Sólo vigentes a la fecha de proceso",
+        value=True,
+        key=f"solo_vigentes_{producto}",
+        help="Negociadas hasta la fecha de proceso y con vencimiento posterior a ella. "
+        "Desactívelo para ver también las vencidas y las que aún no comienzan.",
+    )
+    if solo_vigentes:
+        operaciones = [
+            o for o in operaciones
+            if pd.Timestamp(o["fecha_negociacion"]).date() <= fecha_proceso < pd.Timestamp(o["fecha_vencimiento"]).date()
+        ]  # fmt: skip
+        if not operaciones:
+            st.info(f"No hay operaciones de {PRODUCTOS[producto]} vigentes al {fecha_proceso:%d-%m-%Y}.")
+            st.stop()
 
     resumen = tabla_forwards(operaciones) if producto == "FX_FORWARD" else tabla_swaps(operaciones)
 

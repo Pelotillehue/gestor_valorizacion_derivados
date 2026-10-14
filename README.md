@@ -56,8 +56,8 @@ token que devuelve `POST /auth/login`.
 | `REQUERIR_AUTENTICACION` | `false` desactiva la exigencia de token, sólo para desarrollo local |
 
 `scripts/crear_usuario.py` crea un usuario, le cambia la clave si ya existe, o lo desactiva con
-`--desactivar`. Los scripts que usan la API (`scripts/cargar_indices.py` y
-`ejemplos/cargar_ejemplo.py`) piden usuario y clave por consola, o los toman de
+`--desactivar`. Los scripts que usan la API (`scripts/cargar_indices.py`,
+`scripts/cargar_tipos_cambio.py` y `ejemplos/cargar_ejemplo.py`) piden usuario y clave por consola, o los toman de
 `VALORIZADOR_USUARIO` y `VALORIZADOR_CLAVE`.
 
 ## Ejecución
@@ -93,6 +93,7 @@ Se abre en el navegador en <http://localhost:8501>. Tiene estas páginas:
 | Carga de operaciones | Sube un Excel o CSV con una fila por pata; trae una plantilla descargable con la descripción de cada columna |
 | P&L Realizado | P&L de los FX Forward vencidos en un período (por defecto, desde el 1 de enero), por contraparte, calzados y descalzados, con descarga en Excel |
 | Listado de Operaciones Vigentes | Descarga en Excel y PDF el listado de las operaciones vigentes a la fecha de proceso de cada familia, con su MtM si se pide |
+| Reportes FX Fwd Basilea | Sobre los FX Forward vigentes, como la planilla Operaciones Forward Basilea: Resumen (tablas por tipo de forward, Compra/Venta, descalce, plazo hasta 7 días, resultado y modalidad), Basilea (detalle con valor razonable activo y pasivo y sus tasas) y Líneas (posición neta, exposición, uso de línea y situación por contraparte). Descarga en Excel con las tres hojas y en PDF tamaño tabloide horizontal |
 
 La app no se conecta a la base de datos: todo pasa por la API. Si la API corre en otra
 dirección, se cambia en la barra lateral o con la variable de entorno `VALORIZADOR_API_URL`.
@@ -205,6 +206,7 @@ cálculo más pesado (`GET /cartera/mtm`) tarda menos de un segundo.
 | `GET /cartera/mtm?fecha=` | MtM de todas las operaciones vigentes, con totales por producto |
 | `GET /cartera/vencimientos?fecha=` | Montos que se intercambian al vencimiento de cada operación vigente |
 | `GET /cartera/pnl-realizado?fecha=&desde=` | P&L realizado de los FX Forward vencidos en el período, liquidados al spot de su fecha de pago |
+| `GET /cartera/forwards-basilea?fecha=` | FX Forward vigentes con par, Compra o Venta de la moneda principal, plazo y valor presente en CLP de lo recibido (activo) y lo pagado (pasivo), con la tasa de descuento de cada pata |
 | `GET /cartera/flujos?fecha=` | Todos los flujos futuros de cada pata (nocional e interés), en su moneda y en CLP |
 | `GET /cartera/garantias?fecha=` | Exposición de cada contraparte contra su línea y llamado a constituir garantías |
 | `GET /mercado/resumen` | Series de mercado guardadas y su rango de fechas |
@@ -306,6 +308,14 @@ En `ejemplos/datos.py` hay una operación completa de cada producto.
   ```powershell
   python scripts/cargar_indices.py --fecha 2026-08-17
   ```
+
+  Los tipos de cambio EURCLP, USDCLP y la UF (`CLFCLP`) se cargan del mismo servicio; por
+  defecto los tres, desde el 01-01-2025 hasta hoy (`--pares` elige cuáles, `--listar` muestra
+  las rutas del servicio):
+
+  ```powershell
+  python scripts/cargar_tipos_cambio.py
+  ```
 - **Feriados.** Por código de calendario. Sin feriados cargados sólo se consideran sábados y
   domingos.
 
@@ -401,13 +411,24 @@ psql -U postgres -c "CREATE DATABASE valorizador_test"
 
 ## Cartera sintética
 
-`datos cartera sintetica/` tiene una cartera de prueba de 77 operaciones vigentes al 17-08-2026, con calces, y 22 FX Forward ya vencidos a esa fecha (folios `FXV-`, 8 pares calzados y 6 descalzados) para el P&L realizado. Las vigentes:
+`datos cartera sintetica/` tiene una cartera de prueba de 24 operaciones vigentes al 17-08-2026, con calces, y 22 FX Forward ya vencidos a esa fecha (folios `FXV-`, 8 pares calzados y 6 descalzados) para el P&L realizado. Las vigentes, con calce desde la institución:
 
-| Producto | Operaciones | Calzadas |
-|---|---|---|
-| FX Forward | 60 | 54 |
-| IR Swap | 12 | 10 |
-| CC Swap | 5 | 4 |
+| Producto | Operaciones | Calzadas | Descalzadas |
+|---|---|---|---|
+| FX Forward | 17 | 14 | 3 |
+| IR Swap | 5 | 4 | 1 |
+| CC Swap | 2 | 0 | 2 |
+
+Tres pares de FX Forward y uno de IR Swap se calzan con la misma contraparte, de modo que para
+esa contraparte sus dos operaciones también quedan calzadas entre sí; dos de ellas tienen
+además una tercera operación, descalzada desde su punto de vista.
+
+Los FX Forward son USD/CLP y UF/CLP, más un par calzado EUR/CLP sintético. Para valorizarlo
+hace falta el EURCLP de la fecha de proceso: se carga con `scripts/cargar_tipos_cambio.py`, o, si la base
+tiene EURUSD y USDCLP, la API lo obtiene cruzándolos.
+
+En P&L No Realizado y P&L Realizado, con perspectiva Cliente, una operación cuenta como calzada
+sólo si otra operación de su grupo de calce es con la misma contraparte.
 
 Cada grupo de calce parte de una operación real de la cartera preliminar y se cubre con
 una o dos operaciones en sentido contrario, por el mismo monto y vencimiento y, en los

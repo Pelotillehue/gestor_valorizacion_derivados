@@ -51,7 +51,7 @@ def pantalla_login(aviso: str | None = None) -> None:
     """
     _, centro, _ = st.columns([1.1, 1, 1.1])
     with centro:
-        st.subheader("Valorizador de Derivados", anchor=False)
+        st.subheader("Gestor de Cartera de Derivados", anchor=False)
         if aviso:
             st.warning(aviso)
         with st.form("login"):
@@ -92,7 +92,7 @@ paginas = st.navigation(
             st.Page("paginas/operaciones_irs.py", title="Operaciones Interest Rate Swap", icon=":material/swap_horiz:"),
             st.Page("paginas/operaciones_ccs.py", title="Operaciones Cross Currency Swap", icon=":material/swap_horiz:"),
             st.Page("paginas/mtm.py", title="MtM de cartera", icon=":material/calculate:"),
-            st.Page("paginas/vencimientos.py", title="Vencimientos", icon=":material/event:"),
+            st.Page("paginas/vencimientos.py", title="Calendario de Flujos", icon=":material/event:"),
             st.Page("paginas/contrapartes.py", title="Contrapartes", icon=":material/groups:"),
         ],
         "Mercado": [
@@ -104,6 +104,7 @@ paginas = st.navigation(
             st.Page("paginas/reporte_pnl.py", title="P&L No Realizado", icon=":material/account_balance:"),
             st.Page("paginas/reporte_pnl_realizado.py", title="P&L Realizado", icon=":material/paid:"),
             st.Page("paginas/reportes.py", title="Listado de Operaciones Vigentes", icon=":material/download:"),
+            st.Page("paginas/reporte_basilea.py", title="Reportes FX Fwd Basilea", icon=":material/policy:"),
         ],
         "Archivos": [
             st.Page("paginas/carga.py", title="Carga de operaciones", icon=":material/upload_file:"),

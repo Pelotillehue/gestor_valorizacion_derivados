@@ -16,9 +16,13 @@ Composición:
 
 | Producto   | Operaciones | Calzadas | Descalzadas |
 |------------|-------------|----------|-------------|
-| FX_FORWARD | 60          | 54       | 6           |
-| IR_SWAP    | 12          | 10       | 2           |
-| CC_SWAP    | 5           | 4        | 1           |
+| FX_FORWARD | 17          | 14       | 3           |
+| IR_SWAP    | 5           | 4        | 1           |
+| CC_SWAP    | 2           | 0        | 2           |
+
+Calzadas y descalzadas desde la institución. Algunos pares se calzan con la misma
+contraparte (ver @ref MISMA_CONTRAPARTE): para esa contraparte sus dos operaciones también
+quedan calzadas entre sí. Dos de ellas tienen además una tercera operación descalzada.
 
 Además, 22 FX Forward que vencieron antes de la fecha de proceso (8 pares calzados y 6
 descalzados, folios `FXV-`), para el P&L realizado: cada uno parte de un forward real, con un
@@ -30,14 +34,17 @@ Cómo se arma:
   `swaps.csv`, con los mismos filtros y supuestos de @ref generar_carga_operaciones), que hace
   de operación con el cliente. Así los nocionales, plazos y tasas siguen la distribución de la
   cartera original.
-- Su cobertura es la misma operación en sentido contrario, con otra contraparte: igual monto y
+- Su cobertura es la misma operación en sentido contrario, por lo general con otra
+  contraparte (salvo los pares de @ref MISMA_CONTRAPARTE): igual monto y
   vencimiento y, en los swaps, las mismas fechas de cupón y periodicidad. En los grupos de
   tres, la cobertura se reparte en dos operaciones que suman el monto original.
 - La cobertura tiene un precio algo mejor para la institución, de modo que el grupo deja
   margen: en forwards el monto de la otra moneda se mueve entre 0,05% y 0,30%; en swaps la tasa
   fija, o el spread si no hay pata fija, se mueve entre 2 y 10 puntos base.
-- En un forward el monto que se calza es el de la moneda base del par: CLF en CLFCLP y CLFUSD,
-  USD en USDCLP.
+- En un forward el monto que se calza es el de la moneda base del par: CLF en CLFCLP, USD en
+  USDCLP. Los forwards UF/USD de origen se convierten a UF/CLP (@ref a_uf_clp).
+- Además hay un par calzado de FX Forward EUR/CLP sintético (@ref pares_eur_clp): la cartera
+  de origen no tiene forwards en EUR.
 - Las descalzadas son operaciones reales sin cobertura.
 - Sólo se usan como base operaciones cuyo tipo de cambio pactado está a menos de 10% del spot
   de la fecha de proceso, para evitar precios fuera de mercado.
@@ -83,17 +90,23 @@ PREFIJO_VENCIDOS = "FXV"
 ## Mercado demo, del que se leen los tipos de cambio para fechar y poner precio a los forwards vencidos.
 MERCADO_DEMO = CARPETA.parent / "datos mercados demo" / "cargar_datos_mercado.sql"
 ## Tasa anual aproximada de cada moneda para los puntos forward de los forwards vencidos.
-TASA_FORWARD = {"CLP": 0.0475, "USD": 0.04, "CLF": 0.015}
+TASA_FORWARD = {"CLP": 0.0475, "USD": 0.04, "CLF": 0.015, "EUR": 0.02}
 ## Producto: (prefijo del folio, pares de calce, tríos de calce, descalzadas).
 COMPOSICION = {
-    "FX_FORWARD": ("FX", 18, 6, 6),
-    "IR_SWAP": ("IRS", 2, 2, 2),
-    "CC_SWAP": ("CCS", 2, 0, 1),
+    "FX_FORWARD": ("FX", 6, 0, 3),
+    "IR_SWAP": ("IRS", 2, 0, 1),
+    "CC_SWAP": ("CCS", 0, 0, 2),
 }
+## Pares calzados de FX Forward EUR/CLP sintéticos que se agregan a la cartera.
+PARES_EUR_CLP = 1
+## Pares de calce por producto en que la operación y su cobertura son con la misma contraparte.
+MISMA_CONTRAPARTE = {"FX_FORWARD": 3, "IR_SWAP": 1}
 ## Ajustes manuales posteriores: folio y factor que multiplica los nocionales de ambas patas, de modo que la operación conserva su tipo de cambio implícito.
-AJUSTES_NOCIONAL: dict[str, float] = {}
+AJUSTES_NOCIONAL: dict[str, float] = {"CCS-001": 0.025, "CCS-002": 0.025, "IRS-001": 0.1}
+## Ajustes manuales posteriores: folio y nueva tasa, en tanto por uno, de su pata fija que recibe.
+AJUSTES_TASA_RECIBE: dict[str, float] = {"IRS-003": 0.04145}
 ## Prioridad de monedas para elegir la moneda que se calza en un forward.
-ORDEN_BASE = ["CLF", "USD", "CLP"]
+ORDEN_BASE = ["CLF", "EUR", "USD", "CLP"]
 ## Pesos por unidad al 17-08-2026. Se usan para descartar como base operaciones cuyo tipo de cambio pactado está lejos del mercado.
 SPOT_CLP = {"CLP": 1.0, "USD": 914.15, "CLF": 40855.33}
 ## Desvío máximo del tipo de cambio implícito respecto del spot.
@@ -300,6 +313,8 @@ def generar() -> tuple[list[dict], list[dict]]:
         disponibles = _muestra_estratificada(pool[producto], len(tamanos), azar)
         cobertura = cobertura_forward if producto == "FX_FORWARD" else cobertura_swap
         del_producto = []
+        mismas = MISMA_CONTRAPARTE.get(producto, 0)
+        con_tercera = None  # contraparte de un par propio que además tendrá una descalzada
 
         for tamano in tamanos:
             while True:
@@ -318,6 +333,14 @@ def generar() -> tuple[list[dict], list[dict]]:
                 for op, parte in zip(grupo[1:], partes):
                     next(p for p in op["patas"] if p["moneda"] == moneda)["nocional"] = parte
             contrapartes = azar.sample(CONTRAPARTES, tamano)
+            if tamano == 2 and mismas:
+                # Par calzado con una misma contraparte: también calzado desde su punto de vista.
+                contrapartes = [contrapartes[0]] * 2
+                mismas -= 1
+                con_tercera = con_tercera or contrapartes[0]
+            elif tamano == 1 and con_tercera:
+                # Tercera operación de esa contraparte: para ella queda descalzada.
+                contrapartes, con_tercera = [con_tercera], False
             for i, (op, contraparte) in enumerate(zip(grupo, contrapartes)):
                 op["contraparte"] = contraparte
                 op["rol"] = "DESCALZADA" if tamano == 1 else ("BASE" if i == 0 else "COBERTURA")
@@ -334,6 +357,15 @@ def generar() -> tuple[list[dict], list[dict]]:
         if op["deal_number"] in AJUSTES_NOCIONAL:
             for pata in op["patas"]:
                 pata["nocional"] = round(pata["nocional"] * AJUSTES_NOCIONAL[op["deal_number"]], 2)
+        if op["deal_number"] in AJUSTES_TASA_RECIBE:
+            pata = next(p for p in op["patas"] if p["rec_pay"] == "RECIBE" and p["tipo"] == "FIJA")
+            pata["tasa"] = AJUSTES_TASA_RECIBE[op["deal_number"]]
+
+    # Los forwards UF/USD de la cartera de origen pasan a UF/CLP.
+    spot = leer_spot()
+    for op in operaciones:
+        if op["producto"] == "FX_FORWARD" and {p["moneda"] for p in op["patas"]} == {"CLF", "USD"}:
+            a_uf_clp(op, spot)
 
     # Modalidad por grupo, con tope de entrega física.
     maximo_fisica = int(MAXIMO_ENTREGA_FISICA * len(operaciones))
@@ -346,6 +378,13 @@ def generar() -> tuple[list[dict], list[dict]]:
         fisicas += len(grupo) if fisica else 0
         for op in grupo:
             op["modalidad_liquidacion"] = "ENTREGA_FISICA" if fisica else "COMPENSACION"
+
+    # Forwards EUR/CLP: se agregan al final, con su propio generador aleatorio, para no alterar
+    # el resto de la cartera (folios, contrapartes y modalidades ya asignados).
+    eur = pares_eur_clp(spot, sum(o["producto"] == "FX_FORWARD" for o in operaciones))
+    grupos += eur
+    posicion = max(i for i, o in enumerate(operaciones) if o["producto"] == "FX_FORWARD") + 1
+    operaciones[posicion:posicion] = [op for grupo in eur for op in grupo]
 
     for op in operaciones:
         origen.validar(op)
@@ -406,7 +445,7 @@ def escribir_sql(operaciones: list[dict]) -> None:
 -- El detalle de qué operaciones se calzan entre sí está en calces.csv.
 --
 -- REEMPLAZA TODAS LAS OPERACIONES DE LA BASE, con sus patas e historial, Y TODAS LAS
--- CONTRAPARTES. No toca los datos de mercado. Requiere el esquema en revisión 0006 o
+-- CONTRAPARTES. No toca los datos de mercado. Requiere el esquema en revisión 0007 o
 -- posterior (alembic upgrade head).
 --
 -- Uso:
@@ -520,13 +559,15 @@ def escribir_actualizacion_lineas() -> None:
 
 def leer_spot() -> dict[str, dict[date, float]]:
     """!
-    @brief Tipos de cambio USDCLP y CLFCLP del mercado demo.
+    @brief Tipos de cambio USDCLP, CLFCLP y EURCLP (cruzado con EURUSD) del mercado demo.
     @return Diccionario par → (fecha → valor).
     """
     spot: dict[str, dict[date, float]] = defaultdict(dict)
     texto = MERCADO_DEMO.read_text(encoding="utf-8")
-    for fecha, par, valor in re.findall(r"\('(\d{4}-\d{2}-\d{2})', '(USDCLP|CLFCLP)', ([\d.]+)\)", texto):
+    for fecha, par, valor in re.findall(r"\('(\d{4}-\d{2}-\d{2})', '(USDCLP|CLFCLP|EURUSD)', ([\d.]+)\)", texto):
         spot[par][date.fromisoformat(fecha)] = float(valor)
+    # El mercado demo no trae EURCLP: se cruza EURUSD con USDCLP.
+    spot["EURCLP"] = {f: v * spot["USDCLP"][f] for f, v in spot.pop("EURUSD").items() if f in spot["USDCLP"]}
     return spot
 
 
@@ -539,6 +580,70 @@ def _en_clp(spot: dict[str, dict[date, float]], moneda: str, fecha: date) -> flo
     @return Valor en pesos.
     """
     return 1.0 if moneda == "CLP" else spot[f"{moneda}CLP"][fecha]
+
+
+def pares_eur_clp(spot: dict[str, dict[date, float]], ultimo_folio: int) -> list[list[dict]]:
+    """!
+    @brief Pares calzados de FX Forward EUR/CLP sintéticos (@ref PARES_EUR_CLP).
+
+    Cada par es una compra de EUR a plazo a una contraparte y la venta del mismo monto y
+    vencimiento a otra, con un precio algo mejor (como en @ref cobertura_forward). El precio de la
+    compra es el EURCLP de la fecha de negociación (EURUSD por USDCLP) ajustado por el
+    diferencial de tasas de @ref TASA_FORWARD durante el plazo. Usa su propia semilla.
+    @param spot Resultado de @ref leer_spot.
+    @param ultimo_folio Último número de folio FX ya usado; los nuevos siguen desde ahí.
+    @return Lista de grupos de calce de dos operaciones.
+    """
+    azar = random.Random(SEMILLA + 6)
+    fechas = sorted(f for f in spot["EURCLP"] if date(2026, 5, 1) <= f <= origen.FECHA_PROCESO)
+    grupos, folio = [], ultimo_folio
+    for _ in range(PARES_EUR_CLP):
+        negociacion = azar.choice(fechas)
+        pago = negociacion + timedelta(days=azar.randint(120, 300))
+        if pago.weekday() >= 5:  # sábado o domingo: se pasa al lunes
+            pago += timedelta(days=7 - pago.weekday())
+        t = (pago - negociacion).days / 365
+        precio = spot["EURCLP"][negociacion] * (1 + TASA_FORWARD["CLP"] * t) / (1 + TASA_FORWARD["EUR"] * t)
+        monto = float(azar.choice([250_000, 500_000, 1_000_000]))
+        base = {
+            "producto": "FX_FORWARD",
+            "fecha_negociacion": negociacion,
+            "patas": [
+                {"numero": 1, "tipo": "SIMPLE", "rec_pay": "RECIBE", "moneda": "EUR", "nocional": monto,
+                 "curva_descuento": "Curva EUR", "fecha_pago": pago},
+                {"numero": 2, "tipo": "SIMPLE", "rec_pay": "PAGA", "moneda": "CLP", "nocional": round(monto * precio, 0),
+                 "curva_descuento": "Curva CLP", "fecha_pago": pago},
+            ],
+        }  # fmt: skip
+        grupo = [base, cobertura_forward(base, 1.0, azar)]
+        for op, contraparte, rol in zip(grupo, azar.sample(CONTRAPARTES, 2), ("BASE", "COBERTURA")):
+            folio += 1
+            op.update(deal_number=f"FX-{folio:03d}", contraparte=contraparte, rol=rol, modalidad_liquidacion="COMPENSACION")
+        grupos.append(grupo)
+    return grupos
+
+
+def a_uf_clp(op: dict, spot: dict[str, dict[date, float]]) -> None:
+    """!
+    @brief Convierte un forward UF/USD en UF/CLP, en el lugar.
+
+    Conserva el monto en UF, el sentido de cada pata y las fechas. La pata en USD pasa a CLP,
+    descontada con la curva CLP, por el monto en UF al precio forward UF/CLP de la fecha de
+    negociación: el valor de la UF de ese día (o del último anterior con dato) ajustado por el
+    diferencial de tasas de @ref TASA_FORWARD durante el plazo.
+    @param op Operación FX_FORWARD con patas en CLF y USD.
+    @param spot Resultado de @ref leer_spot.
+    """
+    uf = next(p for p in op["patas"] if p["moneda"] == "CLF")
+    usd = next(p for p in op["patas"] if p["moneda"] == "USD")
+    negociacion = op["fecha_negociacion"]
+    anteriores = [f for f in spot["CLFCLP"] if f <= negociacion]
+    valor_uf = spot["CLFCLP"][max(anteriores)] if anteriores else SPOT_CLP["CLF"]
+    t = (usd["fecha_pago"] - negociacion).days / 365
+    precio = valor_uf * (1 + TASA_FORWARD["CLP"] * t) / (1 + TASA_FORWARD["CLF"] * t)
+    usd["moneda"] = "CLP"
+    usd["curva_descuento"] = "Curva CLP"
+    usd["nocional"] = round(uf["nocional"] * precio, 0)
 
 
 def forward_vencido(base: dict, spot: dict[str, dict[date, float]], azar: random.Random) -> dict:

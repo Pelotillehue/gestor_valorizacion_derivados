@@ -32,6 +32,9 @@ docs/doxygen/
 datos cartera preliminar/*.csv
 datos cartera preliminar/cargar_operaciones.sql
 
+# --- Planillas modelo con datos reales de clientes ---
+informes moldes/
+
 # --- Editores ---
 .vscode/
 .idea/

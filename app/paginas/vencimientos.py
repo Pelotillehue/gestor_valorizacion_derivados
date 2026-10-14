@@ -16,7 +16,7 @@ from comun.formato import COLOR_PRODUCTO, FECHA_INICIAL, MODALIDADES, PRODUCTOS,
 from comun.vista_operaciones import moneda as moneda_visible
 from comun.plantilla import a_excel
 
-st.title("Vencimientos")
+st.title("Calendario de Flujos")
 st.caption(
     "Todos los flujos futuros de las operaciones vigentes: el monto de cada forward y los cupones y "
     "nocionales de cada swap, en CLP al spot de la fecha de proceso. Los cupones flotantes se proyectan "

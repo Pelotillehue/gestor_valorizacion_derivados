@@ -29,7 +29,8 @@ perspectiva = c3.segmented_control(
     "Perspectiva",
     ["Institución", "Cliente"],
     default="Institución",
-    help="Institución: el P&L de la cartera propia. Cliente: el mismo P&L con el signo invertido.",
+    help="Institución: el P&L de la cartera propia. Cliente: el mismo P&L con el signo invertido; una "
+    "operación es calzada sólo si su calce es con la misma contraparte.",
 ) or "Institución"
 
 try:

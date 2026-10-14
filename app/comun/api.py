@@ -312,6 +312,18 @@ def cartera_flujos(url: str, fecha: date) -> dict:
         return _respuesta(c.get("/cartera/flujos", params={"fecha": fecha.isoformat()}))
 
 
+@st.cache_data(ttl=300, show_spinner="Valorizando los forwards…")
+def cartera_forwards_basilea(url: str, fecha: date) -> dict:
+    """!
+    @brief `GET /cartera/forwards-basilea`.
+    @param url Dirección base de la API; forma parte de la clave del caché.
+    @param fecha Fecha de proceso.
+    @return Detalle de los FX Forward vigentes con su valor razonable activo y pasivo.
+    """
+    with _http(url, 600) as c:
+        return _respuesta(c.get("/cartera/forwards-basilea", params={"fecha": fecha.isoformat()}))
+
+
 @st.cache_data(ttl=300, show_spinner="Calculando P&L realizado…")
 def cartera_pnl_realizado(url: str, fecha: date, desde: date) -> dict:
     """!
