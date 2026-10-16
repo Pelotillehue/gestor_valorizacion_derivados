@@ -18,7 +18,7 @@ st.title("P&L Realizado")
 st.caption(
     "P&L de los FX Forward que vencieron en el período: lo recibido menos lo pagado, en CLP al tipo de "
     "cambio de la fecha de pago (si ese día no tiene publicación, el del día hábil anterior). Es el "
-    "mismo resultado en compensación y en entrega física. Por ahora no incluye swaps vencidos."
+    "mismo resultado en compensación y en entrega física."
 )
 
 c1, c2, c3 = st.columns([1.2, 1.2, 1.6])

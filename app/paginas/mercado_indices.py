@@ -11,12 +11,7 @@ from comun import api
 from comun.formato import COLOR_SERIE, NOMBRES_INDICE, columna_numero, en_espanol, numero, rango_fechas
 
 st.title("Índices")
-st.caption(
-    "Nivel publicado de cada índice overnight, el que usa el valorizador para el interés devengado "
-    "de las patas flotantes. La tasa implícita es la tasa overnight anualizada que se desprende "
-    "de dos publicaciones consecutivas, en base ACT/360 lineal; como el índice se publica con pocos "
-    "decimales, esa tasa muestra pequeñas oscilaciones de redondeo."
-)
+st.caption("Nivel publicado de cada índice overnight.")
 
 try:
     disponibles = {s["nombre"]: s for s in api.resumen_mercado(api.url_base())["indices"]}
