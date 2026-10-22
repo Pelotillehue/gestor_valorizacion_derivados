@@ -3,7 +3,9 @@
 @brief Punto de entrada de la app Streamlit del Valorizador de Derivados.
 
 Pide usuario y clave antes de mostrar cualquier página: los valida la API contra la tabla
-`usuario` y entrega un token que la app guarda en la sesión de Streamlit. Luego define el menú
+`usuario` y entrega un token que la app guarda en la sesión de Streamlit y en una cookie del
+navegador (@ref comun.sesion). Así, al actualizar la página o abrir otra pestaña, la sesión se
+retoma sin volver a pedir las credenciales mientras el token siga vigente. Luego define el menú
 (secciones Cartera, Mercado, Reportes y Archivos), el logo y la barra lateral con el usuario,
 la dirección de la API, su estado de conexión y el botón para volver a leer los datos.
 
@@ -18,9 +20,10 @@ de @ref comun.api.
 
 from pathlib import Path
 
+import httpx
 import streamlit as st
 
-from comun import api
+from comun import api, sesion
 
 ## Carpeta con las imágenes de la app.
 CARPETA_ASSETS = Path(__file__).parent / "assets"
@@ -42,6 +45,43 @@ if LOGO.exists():
     )
 
 st.session_state.setdefault("api_url", api.URL_POR_DEFECTO)
+
+## Claves de `st.session_state` que identifican la sesión iniciada.
+CLAVES_SESION = ("token", "usuario", "nombre")
+
+
+def cerrar_sesion() -> None:
+    """!
+    @brief Olvida la sesión en esta pestaña y marca la cookie para borrarla en la siguiente ejecución.
+
+    También impide retomarla desde la cookie: Streamlit sigue entregando las cookies que el
+    navegador envió al conectarse la pestaña, aunque después se borren.
+    """
+    for clave in CLAVES_SESION:
+        st.session_state.pop(clave, None)
+    st.session_state["sesion_cerrada"] = True
+    st.session_state["borrar_cookie"] = True
+
+
+def retomar_sesion() -> None:
+    """!
+    @brief Retoma la sesión guardada en la cookie si la API confirma que el token sigue vigente.
+
+    Si la API rechaza el token, marca la cookie para borrarla. Si la API no responde, la deja,
+    para retomarla cuando vuelva.
+    """
+    token = sesion.token_guardado()
+    if not token:
+        return
+    try:
+        datos = api.datos_sesion(token)
+    except httpx.HTTPError:
+        return
+    if datos is None:
+        st.session_state["sesion_cerrada"] = True
+        st.session_state["borrar_cookie"] = True
+        return
+    st.session_state.update(token=token, usuario=datos["usuario"], nombre=datos.get("nombre"))
 
 
 def pantalla_login(aviso: str | None = None) -> None:
@@ -66,24 +106,35 @@ def pantalla_login(aviso: str | None = None) -> None:
             )
         if ingresar:
             try:
-                sesion = api.login(usuario, clave)
+                datos = api.login(usuario, clave)
             except api.ErrorAPI as e:
                 st.error("Usuario o clave incorrectos." if e.codigo == 401 else api.texto_error(e))
             except Exception as e:
                 st.error(api.texto_error(e))
             else:
-                st.session_state.update(token=sesion["token"], usuario=sesion["usuario"], nombre=sesion.get("nombre"))
+                st.session_state.update(
+                    token=datos["token"], usuario=datos["usuario"], nombre=datos.get("nombre"),
+                    guardar_cookie=datos.get("vence") or "",
+                )
+                st.session_state.pop("sesion_cerrada", None)
                 st.rerun()
 
 
+if not st.session_state.get("token") and not st.session_state.get("sesion_cerrada"):
+    retomar_sesion()
+if st.session_state.pop("borrar_cookie", False):
+    sesion.borrar()
 if not st.session_state.get("token"):
     pantalla_login()
     st.stop()
 if not api.sesion_vigente():
-    for clave in ("token", "usuario", "nombre"):
-        st.session_state.pop(clave, None)
+    cerrar_sesion()
+    sesion.borrar()
+    st.session_state.pop("borrar_cookie", None)
     pantalla_login("La sesión venció o ya no es válida. Ingrese nuevamente.")
     st.stop()
+if "guardar_cookie" in st.session_state:
+    sesion.guardar(st.session_state["token"], st.session_state.pop("guardar_cookie") or None)
 
 paginas = st.navigation(
     {
@@ -116,8 +167,7 @@ paginas = st.navigation(
 with st.sidebar:
     st.caption(f":material/person: {st.session_state.get('nombre') or st.session_state['usuario']}")
     if st.button("Cerrar sesión", icon=":material/logout:", width="stretch"):
-        for clave in ("token", "usuario", "nombre"):
-            st.session_state.pop(clave, None)
+        cerrar_sesion()
         api.limpiar_cache()
         st.rerun()
     st.text_input("Dirección de la API", key="api_url")

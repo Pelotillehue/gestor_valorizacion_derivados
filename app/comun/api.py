@@ -92,6 +92,20 @@ def sesion_vigente() -> bool:
         return True
 
 
+def datos_sesion(token: str) -> dict | None:
+    """!
+    @brief Valida un token con `GET /auth/yo`. La app lo usa para retomar la sesión guardada en la cookie.
+    @param token Token a validar.
+    @return Usuario y nombre si el token es válido; nada si la API lo rechaza (401).
+    @throws httpx.HTTPError Si la API no responde.
+    """
+    with httpx.Client(base_url=url_base(), timeout=10, headers={"Authorization": f"Bearer {token}"}) as c:
+        r = c.get("/auth/yo")
+    if r.status_code == 401:
+        return None
+    return _respuesta(r)
+
+
 def _respuesta(r: httpx.Response):
     """!
     @brief Devuelve el JSON de una respuesta o lanza el error que informa la API.
