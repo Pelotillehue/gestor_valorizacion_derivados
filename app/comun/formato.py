@@ -59,6 +59,27 @@ def columna_numero(decimales: int = 0, etiqueta: str | None = None):
     return st.column_config.NumberColumn(etiqueta, format="localized", step=10**-decimales if decimales else 1)
 
 
+## Columnas de montos del detalle de flujos de una pata. Las tasas, índices, spread y gearing no
+## están aquí, porque redondearlos a enteros los dejaría sin sentido.
+COLUMNAS_MONTO_FLUJO = ("nocional", "amortizacion", "interes", "flujo", "monto", "valor_presente")
+
+
+def tabla_flujos(flujos: list[dict]) -> tuple[pd.DataFrame, dict]:
+    """!
+    @brief Tabla de flujos de una pata lista para `st.dataframe`: montos redondeados a enteros y con separador de miles.
+
+    El redondeo se hace sobre una copia sólo para mostrar; los valores que entrega la API no
+    cambian. Se redondea antes de formatear porque el formato de columna trunca los decimales en
+    vez de redondearlos. Omite `monto_descontado`, que la API entrega para el calendario de flujos.
+    @param flujos Detalle de flujos de una pata, tal como lo entrega la API.
+    @return Tupla (DataFrame, configuración para el parámetro `column_config`).
+    """
+    tabla = pd.DataFrame(flujos).drop(columns="monto_descontado", errors="ignore")
+    montos = [c for c in COLUMNAS_MONTO_FLUJO if c in tabla.columns]
+    tabla[montos] = tabla[montos].round(0)
+    return tabla, {c: columna_numero(0) for c in montos}
+
+
 def en_espanol(grafico):
     """!
     @brief Separador de miles con punto y decimal con coma en los ejes y tooltips de Altair.

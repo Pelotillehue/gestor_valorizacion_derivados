@@ -21,6 +21,7 @@ from comun.formato import (
     par_forward,
     patas_planas,
     rut,
+    tabla_flujos,
 )
 from comun.plantilla import a_excel
 
@@ -349,6 +350,5 @@ def mostrar(producto: str) -> None:
             f"valor presente {numero(pata['valor_presente'], 0)} {moneda(pata['moneda'])} = "
             f"{numero(pata['valor_presente_convertido'], 0)} {moneda(moneda_mtm)}"
         ):
-            # monto_descontado sigue en la respuesta de la API (lo usa el calendario de flujos), pero no se muestra.
-            flujos = pd.DataFrame(pata["flujos"]).drop(columns="monto_descontado", errors="ignore")
-            st.dataframe(flujos, hide_index=True, width="stretch")
+            flujos, formato = tabla_flujos(pata["flujos"])
+            st.dataframe(flujos, hide_index=True, width="stretch", column_config=formato)

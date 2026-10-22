@@ -6,7 +6,17 @@ import pandas as pd
 import streamlit as st
 
 from comun import api
-from comun.formato import FECHA_INICIAL, MODALIDADES, MONEDAS, PRODUCTOS, numero, patas_planas, resumen_operaciones, rut
+from comun.formato import (
+    FECHA_INICIAL,
+    MODALIDADES,
+    MONEDAS,
+    PRODUCTOS,
+    numero,
+    patas_planas,
+    resumen_operaciones,
+    rut,
+    tabla_flujos,
+)
 from comun.plantilla import a_excel
 
 st.title("Operaciones")
@@ -151,6 +161,5 @@ for pata in resultado["patas"]:
         f"valor presente {numero(pata['valor_presente'], 2)} {pata['moneda']} = "
         f"{numero(pata['valor_presente_convertido'], 0)} {moneda}"
     ):
-        # monto_descontado sigue en la respuesta de la API (lo usa el calendario de flujos), pero no se muestra.
-        flujos = pd.DataFrame(pata["flujos"]).drop(columns="monto_descontado", errors="ignore")
-        st.dataframe(flujos, hide_index=True, width="stretch")
+        flujos, formato = tabla_flujos(pata["flujos"])
+        st.dataframe(flujos, hide_index=True, width="stretch", column_config=formato)
