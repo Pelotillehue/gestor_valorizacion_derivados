@@ -15,12 +15,10 @@ from comun import api, reporte_basilea
 from comun.formato import FECHA_INICIAL, columna_numero, numero
 from comun.reporte_pnl import LLAMADO
 
-st.title("Reportes FX Fwd Basilea")
+st.title("Reportes FX Forward")
 st.caption(
-    "FX Forward vigentes a la fecha de proceso. La moneda principal es la extranjera del par (USD o UF): "
-    "**Compra** si la institución la recibe y **Venta** si la entrega. El valor razonable activo es el valor "
-    "presente en CLP de lo que se recibe, el pasivo el de lo que se paga, y el valor razonable su diferencia. "
-    "Las tasas son las de la curva de descuento de cada pata al plazo residual."
+    "FX Forward vigentes a la fecha de proceso. La moneda principal es la extranjera (USD o EUR) o la UF: "
+    "**Compra** si la institución la recibe y **Venta** si la entrega."
 )
 
 c1, _ = st.columns([1, 3])
@@ -93,7 +91,7 @@ def _config(tabla: pd.DataFrame) -> dict:
     return config
 
 
-resumen, basilea, lineas = st.tabs(["Resumen", "Basilea", "Líneas"])
+resumen, basilea, lineas = st.tabs(["Resumen", "Detalle", "Líneas"])
 
 with resumen:
     for titulo, tabla in cuadros:
