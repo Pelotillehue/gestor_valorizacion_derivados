@@ -151,4 +151,6 @@ for pata in resultado["patas"]:
         f"valor presente {numero(pata['valor_presente'], 2)} {pata['moneda']} = "
         f"{numero(pata['valor_presente_convertido'], 0)} {moneda}"
     ):
-        st.dataframe(pd.DataFrame(pata["flujos"]), hide_index=True, width="stretch")
+        # monto_descontado sigue en la respuesta de la API (lo usa el calendario de flujos), pero no se muestra.
+        flujos = pd.DataFrame(pata["flujos"]).drop(columns="monto_descontado", errors="ignore")
+        st.dataframe(flujos, hide_index=True, width="stretch")

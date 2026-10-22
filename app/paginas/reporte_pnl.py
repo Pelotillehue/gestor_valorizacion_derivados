@@ -18,14 +18,14 @@ from comun import api, reporte_pnl
 from comun.formato import FECHA_INICIAL, PRODUCTOS, columna_numero, en_espanol, escala, numero
 
 st.title("P&L No Realizado")
-st.caption(
+# st.caption(
     #"MtM de las operaciones vigentes agrupado por contraparte"
     #"Una operación está **calzada** cuando "
     #"tiene un grupo de calce, es decir, otra u otras operaciones la cubren en el mismo monto y "
     #"vencimiento; si no, está **descalzada**. Las operaciones ya vencidas están en **P&L Realizado**. "
     #"Hay **llamado a constituir garantías** cuando la exposición de la contraparte supera su monto de línea; "
     #"se llama por el exceso o por el MTA, el mayor de los dos."
-)
+# )
 
 c1, c2, c3 = st.columns([1.2, 2.4, 1.6])
 fecha = c1.date_input("Fecha de proceso", value=st.session_state.get("fecha_proceso", FECHA_INICIAL), format="DD-MM-YYYY")
