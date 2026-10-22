@@ -155,7 +155,7 @@ paginas = st.navigation(
             st.Page("paginas/reporte_pnl.py", title="P&L No Realizado", icon=":material/account_balance:"),
             st.Page("paginas/reporte_pnl_realizado.py", title="P&L Realizado", icon=":material/paid:"),
             st.Page("paginas/reportes.py", title="Listado de Operaciones Vigentes", icon=":material/download:"),
-            st.Page("paginas/reporte_basilea.py", title="Reportes FX Fwd Basilea", icon=":material/policy:"),
+            st.Page("paginas/reporte_basilea.py", title="Reportes FX Fwd", icon=":material/policy:"),
         ],
         "Archivos": [
             st.Page("paginas/carga.py", title="Carga de operaciones", icon=":material/upload_file:"),
