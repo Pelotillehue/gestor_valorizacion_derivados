@@ -14,9 +14,9 @@ from comun.formato import numero, rut
 
 st.title("Contrapartes")
 st.caption(
-    "Una operación se asocia a su contraparte por el RUT. El **monto de línea** es la exposición a favor "
-    "de la institución que se acepta sin garantías, y el **MTA** el monto mínimo de transferencia: "
-    "si la exposición supera la línea, se llama por el exceso o por el MTA, el mayor de los dos. Ambos en CLP."
+    #"Una operación se asocia a su contraparte por el RUT. El **monto de línea** es la exposición a favor "
+    #"de la institución que se acepta sin garantías, y el **MTA** el monto mínimo de transferencia: "
+    #"si la exposición supera la línea, se llama por el exceso o por el MTA, el mayor de los dos. Ambos en CLP."
 )
 
 try:

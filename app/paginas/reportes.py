@@ -12,8 +12,7 @@ from comun.formato import FECHA_INICIAL, MONEDAS, PRODUCTOS, columna_numero, num
 
 st.title("Listado de Operaciones Vigentes")
 st.caption(
-    "Operaciones vigentes a la fecha de proceso (ya negociadas y aún no vencidas), con sus datos, un reporte "
-    "por familia de producto."
+    "Operaciones vigentes a la fecha de proceso"
 )
 
 try:

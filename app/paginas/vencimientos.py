@@ -19,8 +19,9 @@ from comun.plantilla import a_excel
 st.title("Calendario de Flujos")
 st.caption(
     "Todos los flujos futuros de las operaciones vigentes: el monto de cada forward y los cupones y "
-    "nocionales de cada swap, en CLP al spot de la fecha de proceso. Los cupones flotantes se proyectan "
-    "con la curva de cada pata. Positivo lo que se recibe y negativo lo que se paga."
+    "nocionales de cada swap, en CLP al spot de la fecha de proceso."
+    #"Los cupones flotantes se proyectan "
+    #"con la curva de cada pata. Positivo lo que se recibe y negativo lo que se paga."
 )
 
 ## Horizonte de vencimientos que se muestra, desde la fecha de proceso.
