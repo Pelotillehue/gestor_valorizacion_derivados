@@ -45,6 +45,13 @@ La app pide usuario y clave antes de mostrar cualquier página. La API los compa
 `usuario`, donde la clave se guarda como hash PBKDF2-SHA256 con sal, nunca en texto plano, y
 entrega un token de sesión firmado que vale `HORAS_SESION` horas (12 por defecto).
 
+La app guarda el token también en una cookie del navegador, `valorizador_sesion`, con el mismo
+vencimiento. Así, al actualizar la página o abrir otra pestaña no vuelve a pedir las
+credenciales mientras el token siga vigente; antes de usarla, la valida con `GET /auth/yo`.
+"Cerrar sesión" borra la cookie. Cerrar el navegador no la borra: en un equipo compartido hay
+que cerrar sesión. La cookie la escribe JavaScript en el navegador, porque Streamlit no permite
+escribir cookies desde Python, y por eso no puede ser HttpOnly.
+
 Todos los endpoints salvo `GET /salud` y `POST /auth/login` exigen ese token en el header
 `Authorization: Bearer <token>`. En `/docs` se ingresa con el botón *Authorize*, pegando el
 token que devuelve `POST /auth/login`.
